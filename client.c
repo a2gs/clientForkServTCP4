@@ -1,3 +1,20 @@
+/* Andre Augusto Giannotti Scota (a2gs)                              
+ * andre.scota@gmail.com
+ *
+ * A C TCPIPv4 client (with DNS resolution)
+ *
+ * Public Domain
+ *
+ */
+
+/* client.c
+ *
+ *  Who     | When       | What
+ *  --------+------------+----------------------------
+ *   a2gs   | 01/01/2005 | Creation
+ *          |            |
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -13,10 +30,10 @@
 
 int main(int argc, char **argv)
 {
-	int sockfd;
+	int sockfd = 0;
 	struct sockaddr_in servaddr;
-	char msg[MAXLINE];
-	struct hostent *servResolved;
+	char msg[MAXLINE] = {0};
+	struct hostent *servResolved = NULL;
 	struct in_addr ip_addr;
 
 	if(argc != 3){
