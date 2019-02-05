@@ -1,3 +1,20 @@
+/* Andre Augusto Giannotti Scota (a2gs)                              
+ * andre.scota@gmail.com
+ *
+ * A C TCPIPv4 server (fork() after accept())
+ *
+ * Public Domain
+ *
+ */
+
+/* serv.c
+ *
+ *  Who     | When       | What
+ *  --------+------------+----------------------------
+ *   a2gs   | 01/01/2005 | Creation
+ *          |            |
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -26,11 +43,11 @@ static FILE *log;
 int main(int argc, char **argv)
 {
 	pid_t p;
-	int listenfd, connfd, readRet;
+	int listenfd = 0, connfd = 0, readRet = 0;
 	socklen_t len;
 	struct sockaddr_in servaddr, cliaddr;
-	char addStr[255 + 1];
-	char msg[MAXLINE], *endLine;
+	char addStr[255 + 1] = {0};
+	char msg[MAXLINE] = {0}, *endLine = NULL;
 
 	if(argc != 2){
 		fprintf(stderr, "%s PORT\n", argv[0]);
