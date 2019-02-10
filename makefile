@@ -1,10 +1,16 @@
+
+CC = gcc
+CFLAGS = -g -Wall -std=c11 -D_XOPEN_SOURCE=700
+
+RM = rm -f
+
 all: clean server client
 
 client:
-	cc -o client client.c -Wall -std=c11
+	$(CC) -o client client.c $(CFLAGS)
 
 server:
-	cc -o serv serv.c -Wall -std=c11
+	$(CC) -o serv serv.c $(CFLAGS)
 
 clean:
-	-rm -rf serv client
+	-$(RM) serv client
