@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
 	ip_addr = *(struct in_addr *)(servResolved->h_addr);
 
-	if(inet_pton(AF_INET, inet_ntoa(ip_addr), &servaddr.sin_addr) != -1){
+	if(inet_pton(AF_INET, inet_ntoa(ip_addr), &servaddr.sin_addr) != 1){
 		printf("ERRO: inet_pton() [%s]\n", strerror(errno));
 		return(-1);
 	}
