@@ -16,4 +16,4 @@ server:
 	$(CC) -o serv serv.c $(CFLAGS)
 
 clean:
-	-$(RM) serv client
+	-$(RM) serv client client2
