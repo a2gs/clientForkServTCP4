@@ -1,19 +1,16 @@
 CC = gcc
-CFLAGS = -g -Wall -std=c11 -D_XOPEN_SOURCE=700
+CFLAGS = -g -Wall -std=c11 -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -D_POSIX_SOURCE=1 -D_DEFAULT_SOURCE=1 -D_GNU_SOURCE=1
 CFLAGS_OLD = -g -Wall
 
 RM = rm -f
 
-all: clean server client client2
+all: clean server client
 
 client:
 	$(CC) -o client client.c $(CFLAGS_OLD)
-
-client2:
-	$(CC) -o client2 client2.c $(CFLAGS)
 
 server:
 	$(CC) -o serv serv.c $(CFLAGS)
 
 clean:
-	-$(RM) serv client client2
+	-$(RM) serv client
