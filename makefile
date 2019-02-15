@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -g -Wall -std=c11 -D_XOPEN_SOURCE=700
-CFLAGS_OLD = -g -Wall -std=c11
+CFLAGS_OLD = -g -Wall
 
 RM = rm -f
 
