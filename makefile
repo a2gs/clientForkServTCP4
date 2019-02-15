@@ -1,4 +1,3 @@
-
 CC = gcc
 CFLAGS = -g -Wall -std=c11
 
