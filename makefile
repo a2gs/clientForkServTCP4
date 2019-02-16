@@ -9,7 +9,7 @@ CFLAGS = $(CFLAGS_OPTIMIZATION) $(CFLAGS_VERSION) $(CFLAGS_WARNINGS) $(CFLAGS_DE
 
 CFLAGS_OLD = -g -Wall #for deprecated gethostbyname(3)
 
-RM = rm -f
+RM = rm -rf
 
 all: clean server client
 
