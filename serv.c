@@ -34,102 +34,36 @@
 #define RUNNING_DIR  "./"
 #define LOCK_FILE    "servlock"
 
-int daemonize();
-void signal_handler(int );
-
 static int lockFd;
 static FILE *log;
 
-int main(int argc, char **argv)
+void signal_handler(int sig)
 {
-	pid_t p;
-	int listenfd = 0, connfd = 0, readRet = 0;
-	socklen_t len;
-	struct sockaddr_in servaddr, cliaddr;
-	char addStr[255 + 1] = {0};
-	char msg[MAXLINE] = {0}, *endLine = NULL;
+	/* Qualquer sinal recebido ira terminar o server */
 
-	if(argc != 2){
-		fprintf(stderr, "%s PORT\n", argv[0]);
-		return(1);
+	fprintf(log, "Got signal [%d]!\n", sig);
+
+	switch(sig){
+		case SIGHUP:
+			break;
+		case SIGTERM:
+			break;
 	}
 
-	if((log = fopen("./log.text", "wr")) == NULL){
-		fprintf(stderr, "Unable to open/create log.text! [%s]", strerror(errno));
-		return(1);
-	}
-	setbuf(log, NULL);
-
-	fprintf(log, "StartUp!\n");
-
-	if(daemonize() == -1){
-		fprintf(log, "Cannt daemonize server\n");
-		return(1);
+	if(lockf(lockFd, F_ULOCK, 0) < 0){
+		fprintf(log, "Cannt unlock 'only one instance' file.\n");
+		exit(-1);
 	}
 
-	listenfd = socket(AF_INET, SOCK_STREAM, 0);
-
-	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family      = AF_INET;
-	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port        = htons(atoi(argv[1]));
-
-	if(bind(listenfd, (const struct sockaddr *) &servaddr, sizeof(servaddr)) != 0){
-		fprintf(log, "Erro bind: [%s]\n", strerror(errno));
-		return(1);
+	close(lockFd);
+	if(unlink(LOCK_FILE) != 0){
+		fprintf(log, "Erro deleting lock file [%s].\n", LOCK_FILE);
 	}
 
-	if(listen(listenfd, 1024) != 0){
-		fprintf(log, "Erro listen: [%s]\n", strerror(errno));
-		return(1);
-	}
+	/* Termina servidor */
+	exit(0);
 
-	for(;;){
-		len = sizeof(cliaddr);
-		connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &len);
-		if(connfd == -1){
-			fprintf(log, "Erro accept: [%s]\n", strerror(errno));
-			return(1);
-		}
-
-		fprintf(log, "Connection from %s, port %d\n", inet_ntop(AF_INET, &cliaddr.sin_addr, addStr, sizeof(addStr)), ntohs(cliaddr.sin_port));
-		p = fork();
-
-		if(p == 0){ /* child */
-			while(1){
-				memset(msg, 0, MAXLINE);
-
-				readRet = recv(connfd, msg, MAXLINE, 0);
-				if(readRet == 0){
-					fprintf(log, "End of data\n");
-					break;
-				}
-
-				if(readRet < 0){
-					fprintf(log, "Erro recv(): [%s]\n", strerror(errno));
-					break;
-				}
-
-				endLine = strrchr(msg, '\r');
-				if(endLine != NULL) (*endLine) = '\0';
-
-				if(strncmp((char *)msg, "exit", 4) == 0) break; /* while() */
-
-				fprintf(log, "msg: [%s]\n", msg);
-			}
-
-			close(connfd);
-			break; /* for() */
-
-		}else if(p == -1)
-			fprintf(log, "Erro fork: [%s]\n", strerror(errno));
-
-		close(connfd);
-	}
-
-	fclose(log);
-
-	return(0);
+	return;
 }
 
 int daemonize(void)
@@ -189,31 +123,98 @@ int daemonize(void)
 	return(1);
 }
 
-void signal_handler(int sig)
+int main(int argc, char **argv)
 {
-	/* Qualquer sinal recebido ira terminar o server */
+	pid_t p;
+	int listenfd = 0, connfd = 0, readRet = 0;
+	socklen_t len;
+	struct sockaddr_in servaddr, cliaddr;
+	char addStr[255 + 1] = {0};
+	char msg[MAXLINE] = {0}, *endLine = NULL;
 
-	fprintf(log, "Got signal [%d]!\n", sig);
-
-	switch(sig){
-		case SIGHUP:
-			break;
-		case SIGTERM:
-			break;
+	if(argc != 2){
+		fprintf(stderr, "%s PORT\n", argv[0]);
+		return(1);
 	}
 
-	if(lockf(lockFd, F_ULOCK, 0) < 0){
-		fprintf(log, "Cannt unlock 'only one instance' file\n");
-		exit(-1);
+	if((log = fopen("./log.text", "wr")) == NULL){
+		fprintf(stderr, "Unable to open/create log.text! [%s]", strerror(errno));
+		return(1);
+	}
+	setbuf(log, NULL);
+
+	fprintf(log, "StartUp!\n");
+
+	if(daemonize() == -1){
+		fprintf(log, "Cannt daemonize server.\n");
+		return(1);
 	}
 
-	close(lockFd);
-	if(unlink(LOCK_FILE) != 0){
-		fprintf(log, "Erro deleting lock file [%s].\n", LOCK_FILE);
+	listenfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(listenfd == -1){
+		fprintf(log, "ERRO socket(): [%s].\n", strerror(errno));
+		return(1);
 	}
 
-	/* Termina servidor */
-	exit(0);
+	memset(&servaddr, 0, sizeof(servaddr));
+	servaddr.sin_family      = AF_INET;
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	servaddr.sin_port        = htons(atoi(argv[1]));
 
-	return;
+	if(bind(listenfd, (const struct sockaddr *) &servaddr, sizeof(servaddr)) != 0){
+		fprintf(log, "ERRO bind(): [%s].\n", strerror(errno));
+		return(1);
+	}
+
+	if(listen(listenfd, 1024) != 0){
+		fprintf(log, "ERRO listen(): [%s].\n", strerror(errno));
+		return(1);
+	}
+
+	for(;;){
+		len = sizeof(cliaddr);
+		connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &len);
+		if(connfd == -1){
+			fprintf(log, "ERRO accept(): [%s].\n", strerror(errno));
+			return(1);
+		}
+
+		fprintf(log, "Connection from %s, port %d\n", inet_ntop(AF_INET, &cliaddr.sin_addr, addStr, sizeof(addStr)), ntohs(cliaddr.sin_port));
+		p = fork();
+
+		if(p == 0){ /* child */
+			while(1){
+				memset(msg, 0, MAXLINE);
+
+				readRet = recv(connfd, msg, MAXLINE, 0);
+				if(readRet == 0){
+					fprintf(log, "End of data\n");
+					break;
+				}
+
+				if(readRet < 0){
+					fprintf(log, "ERRO recv(): [%s].\n", strerror(errno));
+					break;
+				}
+
+				endLine = strrchr(msg, '\r');
+				if(endLine != NULL) (*endLine) = '\0';
+
+				if(strncmp((char *)msg, "exit", 4) == 0) break; /* while() */
+
+				fprintf(log, "msg: [%s]\n", msg);
+			}
+
+			close(connfd);
+			break; /* for() */
+
+		}else if(p == -1)
+			fprintf(log, "ERRO fork(): [%s].\n", strerror(errno));
+
+		close(connfd);
+	}
+
+	fclose(log);
+
+	return(0);
 }
