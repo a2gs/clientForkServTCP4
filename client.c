@@ -8,6 +8,7 @@
  */
 
 /* client.c
+ * Using getaddrinfo (IPv4 only. IPv4/IPv6 compatible version is another project)
  *
  *  Who     | When       | What
  *  --------+------------+----------------------------
@@ -15,83 +16,78 @@
  *          |            |
  */
 
+
 #include <stdio.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <stdlib.h>
+#include <signal.h>
 #include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include "sc.h"
 
+#define STRADDR_SZ	(50) /* max size IPv6 number format */
+
 int main(int argc, char **argv)
 {
+	struct addrinfo hints, *res = NULL, *rp = NULL;
+	int errGetAddrInfoCode = 0, errConnect = 0;
 	int sockfd = 0;
-	struct sockaddr_in servaddr;
 	char msg[MAXLINE] = {0};
-	struct hostent *servResolved = NULL;
-	struct in_addr ip_addr;
+	char strAddr[STRADDR_SZ + 1] = {'\0'};
+	void *pAddr = NULL;
 
 	if(argc != 3){
-		fprintf(stderr, "%s IP_ADDRESS PORT\n", argv[0]);
+		fprintf(stderr, "%s IPv4_DNS_ADDRESS PORT\n", argv[0]);
 		return(-1);
 	}
 
 	signal(SIGPIPE, SIG_IGN);
 
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-		printf("ERRO: socket() [%s]\n", strerror(errno));
+	memset (&hints, 0, sizeof (hints));
+	hints.ai_family = AF_INET; /* Forcing IPv4. IPv6: AF_UNSPEC or AF_INET6 */
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags |= AI_CANONNAME | AI_ADDRCONFIG; /* getaddrinfo() AI_ADDRCONFIG: This flag is useful on, for example, IPv4-only  systems, to ensure that getaddrinfo() does not return IPv6 socket addresses that would always fail in connect(2) or bind(2) */
+
+	errGetAddrInfoCode = getaddrinfo(argv[1], argv[2], &hints, &res);
+	if(errGetAddrInfoCode != 0){
+		printf("ERRO: getaddrinfo() [%s].\n", gai_strerror(errGetAddrInfoCode));
 		return(-1);
 	}
 
-	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_port   = htons(atoi(argv[2]));
-
-	servResolved = gethostbyname(argv[1]);
-	if(servResolved == NULL){
-
-		printf("ERRO: gethostbyname() ");
-		switch(h_errno){
-			case HOST_NOT_FOUND:
-				printf("[The specified host is unknown]\n");
-				break;
-
-			case NO_ADDRESS:
-			/*case NO_DATA:*/
-				printf("[The requested name is valid but does not have an IP address]\n");
-				break;
-
-			case NO_RECOVERY:
-				printf("[A non-recoverable name server error occurred]\n");
-				break;
-
-			case TRY_AGAIN:
-				printf("[A temporary error occurred on an authoritative name server. Try again later]\n");
-				break;
-
-			default:
-				printf("[error unknow]\n");
-				break;
+	for(rp = res; rp != NULL; rp = rp->ai_next){
+		/* res->ai_family must be AF_INET (IPv4), but this loop is useful to try connect to anothers address to a given DNS */
+		sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (sockfd == -1){
+			printf("ERRO: socket() [%s].\n", strerror(errno));
+			continue;
 		}
+
+		pAddr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
+		inet_ntop (res->ai_family, pAddr, strAddr, STRADDR_SZ);
+		printf("Trying connect to [%s/%s:%s].\n", res->ai_canonname, strAddr, argv[2]);
+
+		errConnect = connect(sockfd, res->ai_addr, res->ai_addrlen);
+		if(errConnect == 0)
+			break;
+
+		pAddr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
+		inet_ntop (res->ai_family, pAddr, strAddr, STRADDR_SZ);
+		printf("ERRO: connect() to [%s/%s:%s] [%s].\n", res->ai_canonname, strAddr, argv[2], strerror(errno));
+
+		close(sockfd);
+	}
+
+	if(res == NULL || errConnect == -1){ /* End of getaddrinfo() list or connect() returned error */
+		printf("ERRO: Unable connect to any address.\n");
 		return(-1);
 	}
 
-	ip_addr = *(struct in_addr *)(servResolved->h_addr);
-
-	if(inet_pton(AF_INET, inet_ntoa(ip_addr), &servaddr.sin_addr) != 1){
-		printf("ERRO: inet_pton() [%s]\n", strerror(errno));
-		return(-1);
-	}
-
-	if(connect(sockfd, (const struct sockaddr *) &servaddr, sizeof(servaddr)) < 0){
-		printf("ERRO: connect() [%s]\n", strerror(errno));
-		return(-1);
-	}
+	freeaddrinfo(res);
 
 	for(;;){
 		memset(msg, 0, MAXLINE);
@@ -99,13 +95,13 @@ int main(int argc, char **argv)
 		memcpy(msg, "ok", 2);
 
 		if(send(sockfd, msg, 2, 0) == -1){
-			printf("ERRO: send() [%s]\n", strerror(errno));
+			printf("ERRO: send() [%s].\n", strerror(errno));
 			break;
 		}
 		sleep(2);
+
 	}
 
 	close(sockfd);
-
 	return(0);
 }
