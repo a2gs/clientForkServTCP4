@@ -9,13 +9,16 @@ CFLAGS = $(CFLAGS_OPTIMIZATION) $(CFLAGS_VERSION) $(CFLAGS_WARNINGS) $(CFLAGS_DE
 
 RM = rm -rf
 
-all: clean server client
+all: clean server client client_old
 
 client:
-	$(CC) -o client client.c $(CFLAGS) #for deprecated gethostbyname(3)
+	$(CC) -o client client.c $(CFLAGS)
+
+client_old:
+	$(CC) -o client_old client_old.c $(CFLAGS)
 
 server:
 	$(CC) -o serv serv.c $(CFLAGS)
 
 clean:
-	-$(RM) serv client
+	-$(RM) serv client client_old
