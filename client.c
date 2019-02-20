@@ -8,7 +8,6 @@
  */
 
 /* client.c
- * Using getaddrinfo (IPv4 only. IPv4/IPv6 compatible version is another project)
  *
  *  Who     | When       | What
  *  --------+------------+----------------------------
@@ -49,7 +48,7 @@ int main(int argc, char **argv)
 	signal(SIGPIPE, SIG_IGN);
 
 	memset (&hints, 0, sizeof (hints));
-	hints.ai_family = AF_INET; /* Forcing IPv4. IPv6: AF_UNSPEC or AF_INET6 */
+	hints.ai_family = AF_INET; /* Forcing IPv4. The best thing to do is specify: AF_UNSPEC (IPv4 and IPv6 servers support) */
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags |= AI_CANONNAME | AI_ADDRCONFIG; /* getaddrinfo() AI_ADDRCONFIG: This flag is useful on, for example, IPv4-only  systems, to ensure that getaddrinfo() does not return IPv6 socket addresses that would always fail in connect(2) or bind(2) */
 
@@ -61,23 +60,24 @@ int main(int argc, char **argv)
 
 	for(rp = res; rp != NULL; rp = rp->ai_next){
 		/* res->ai_family must be AF_INET (IPv4), but this loop is useful to try connect to anothers address to a given DNS */
-		sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 		if (sockfd == -1){
 			printf("ERRO: socket() [%s].\n", strerror(errno));
 			continue;
 		}
 
-		pAddr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
-		inet_ntop (res->ai_family, pAddr, strAddr, STRADDR_SZ);
-		printf("Trying connect to [%s/%s:%s].\n", res->ai_canonname, strAddr, argv[2]);
+		if(rp->ai_family == AF_INET)       pAddr = &((struct sockaddr_in *) rp->ai_addr)->sin_addr;
+		else if(rp->ai_family == AF_INET6) pAddr = &((struct sockaddr_in6 *) rp->ai_addr)->sin6_addr;
+		else                               pAddr = NULL;
 
-		errConnect = connect(sockfd, res->ai_addr, res->ai_addrlen);
+		inet_ntop(rp->ai_family, pAddr, strAddr, STRADDR_SZ);
+		printf("Trying connect to [%s/%s:%s].\n", rp->ai_canonname, strAddr, argv[2]);
+
+		errConnect = connect(sockfd, rp->ai_addr, rp->ai_addrlen);
 		if(errConnect == 0)
 			break;
 
-		pAddr = &((struct sockaddr_in *) res->ai_addr)->sin_addr;
-		inet_ntop (res->ai_family, pAddr, strAddr, STRADDR_SZ);
-		printf("ERRO: connect() to [%s/%s:%s] [%s].\n", res->ai_canonname, strAddr, argv[2], strerror(errno));
+		printf("ERRO: connect() to [%s/%s:%s] [%s].\n", rp->ai_canonname, strAddr, argv[2], strerror(errno));
 
 		close(sockfd);
 	}
