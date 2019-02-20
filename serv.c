@@ -37,6 +37,22 @@
 static int lockFd;
 static FILE *log;
 
+int unlockAndDeleteLockFile(void)
+{
+	if(lockf(lockFd, F_ULOCK, 0) < 0){
+		fprintf(log, "Cannt unlock 'only one instance' file.\n");
+		return(-1);
+	}
+
+	close(lockFd);
+	if(unlink(LOCK_FILE) != 0){
+		fprintf(log, "Erro deleting lock file [%s].\n", LOCK_FILE);
+		return(-1);
+	}
+
+	return(0);
+}
+
 void signal_handler(int sig)
 {
 	/* Qualquer sinal recebido ira terminar o server */
@@ -50,15 +66,7 @@ void signal_handler(int sig)
 			break;
 	}
 
-	if(lockf(lockFd, F_ULOCK, 0) < 0){
-		fprintf(log, "Cannt unlock 'only one instance' file.\n");
-		exit(-1);
-	}
-
-	close(lockFd);
-	if(unlink(LOCK_FILE) != 0){
-		fprintf(log, "Erro deleting lock file [%s].\n", LOCK_FILE);
-	}
+	unlockAndDeleteLockFile();
 
 	/* Termina servidor */
 	exit(0);
@@ -93,17 +101,17 @@ int daemonize(void)
 	/* Criando e travando arquivo de execucao unica */
 	lockFd = open(LOCK_FILE, O_RDWR|O_CREAT|O_EXCL, 0640);
 	if(lockFd == -1){
-		fprintf(log, "There is another instance already running\n");
+		fprintf(log, "There is another instance already running.\n");
 		exit(-1);
 	}
 
 	if(lockf(lockFd, F_TLOCK, 0) < 0){
-		fprintf(log, "Cannt test 'only one instance' file\n");
+		fprintf(log, "Cannt test 'only one instance' file.\n");
 		return(-1);
 	}
 
 	if(lockf(lockFd, F_LOCK, 0) < 0){
-		fprintf(log, "Cannt lock 'only one instance' file\n");
+		fprintf(log, "Cannt lock 'only one instance' file.\n");
 		return(-1);
 	}
 
@@ -138,7 +146,7 @@ int main(int argc, char **argv)
 	}
 
 	if((log = fopen("./log.text", "wr")) == NULL){
-		fprintf(stderr, "Unable to open/create log.text! [%s]", strerror(errno));
+		fprintf(stderr, "Unable to open/create log.text! [%s].", strerror(errno));
 		return(1);
 	}
 	setbuf(log, NULL);
@@ -150,24 +158,26 @@ int main(int argc, char **argv)
 		return(1);
 	}
 
-	listenfd = socket(AF_INET, SOCK_STREAM, 0);
+	listenfd = socket(AF_INET, SOCK_STREAM, 0); /* For IPv6: AF_INET6 (but listen() must receives a sockaddr_in6 struct) */
 	if(listenfd == -1){
 		fprintf(log, "ERRO socket(): [%s].\n", strerror(errno));
 		return(1);
 	}
 
 	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family      = AF_INET;
+	servaddr.sin_family      = AF_INET; /* The best thing to do is specify: AF_UNSPEC (IPv4 and IPv6 clients support) */
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port        = htons(atoi(argv[1]));
 
 	if(bind(listenfd, (const struct sockaddr *) &servaddr, sizeof(servaddr)) != 0){
 		fprintf(log, "ERRO bind(): [%s].\n", strerror(errno));
+		unlockAndDeleteLockFile();
 		return(1);
 	}
 
 	if(listen(listenfd, 1024) != 0){
 		fprintf(log, "ERRO listen(): [%s].\n", strerror(errno));
+		unlockAndDeleteLockFile();
 		return(1);
 	}
 
@@ -179,7 +189,7 @@ int main(int argc, char **argv)
 			return(1);
 		}
 
-		fprintf(log, "Connection from %s, port %d\n", inet_ntop(AF_INET, &cliaddr.sin_addr, addStr, sizeof(addStr)), ntohs(cliaddr.sin_port));
+		fprintf(log, "Connection from %s, port %d\n", inet_ntop(cliaddr.sin_family, &cliaddr.sin_addr, addStr, sizeof(addStr)), ntohs(cliaddr.sin_port));
 		p = fork();
 
 		if(p == 0){ /* child */
