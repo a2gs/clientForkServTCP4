@@ -3,7 +3,7 @@
  *
  * A C TCPIPv4 client (with DNS resolution)
  *
- * Public Domain
+ * MIT License
  *
  */
 
