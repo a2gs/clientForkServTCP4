@@ -102,6 +102,6 @@ int main(int argc, char *argv[])
 
 	}
 
-	close(sockfd);
+	shutdown(sockfd, SHUT_RDWR);
 	return(0);
 }
