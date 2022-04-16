@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
 		}else if(p == -1)
 			fprintf(log, "ERRO fork(): [%s].\n", strerror(errno));
 
-		close(connfd);
+		shutdown(connfd, SHUT_RDWR);
 	}
 
 	fclose(log);
